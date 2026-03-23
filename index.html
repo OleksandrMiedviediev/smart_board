@@ -1,0 +1,228 @@
+
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Staffing Board</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="header">SHIP STAFFING BOARD</div>
+
+    <div class="controls-panel">
+        <div class="date-selector">
+            <button class="date-nav-btn" onclick="changeDate(-1)">◀</button>
+            <input type="date" id="currentDate" onchange="loadDateData()">
+            <button class="date-nav-btn" onclick="changeDate(1)">▶</button>
+        </div>
+        <div class="board-meta">
+            <span>Data tablicy: <strong id="boardDateLabel">-</strong></span>
+            <span>Utworzona: <strong id="boardCreatedAt">-</strong></span>
+            <span id="connStatusSpan" style="display:none;">Pokój: <strong id="roomId">-</strong> <span id="connStatus">●</span></span>
+        </div>
+        <div class="scan-panel">
+            <input type="text" id="scanInput" placeholder="Skanuj ID pracownika (Enter)" />
+            <div id="scanResult" style="display:none; margin-left:12px; font-size:20px; font-weight:bold; min-width:30px;">
+                <span id="scanResultIcon">●</span>
+            </div>
+        </div>
+        <div class="btn-group">
+            <button class="add-employee-btn" onclick="openAddEmployeeModal()">+ Dodaj pracownika</button>
+            <button class="manage-shifts-btn" onclick="openShiftsModal()">⚙ Zarządzaj zmianami</button>
+            <button class="manage-shifts-btn" onclick="exportEmployeesCsv()">⬇ Eksport CSV</button>
+            <button class="manage-shifts-btn" onclick="triggerImportCsv()">⬆ Import CSV</button>
+            <button class="manage-shifts-btn" onclick="exportBoardJson()">⬇ Eksport Tabeli</button>
+            <button class="manage-shifts-btn" onclick="triggerImportBoardJson()">⬆ Import Tabeli</button>
+            <button class="manage-shifts-btn" onclick="shareEmployeesData()">🔗 Udostępnij</button>
+            <button class="manage-shifts-btn" onclick="openRoomModal()">👥 Pokój Współpracy</button>
+            <input type="file" id="csvImportInput" accept=".csv,text/csv" style="display:none;">
+            <input type="file" id="jsonImportInput" accept=".json,application/json" style="display:none;">
+        </div>
+    </div>
+
+    <div class="counter-panel">
+        <div class="counter">
+            <span>Ogółem na tablicy:</span>
+            <span class="counter-value" id="totalCount">0</span>
+        </div>
+        <div class="counter">
+            <span>OOP:</span>
+            <span class="counter-value" id="oopCount">0</span>
+        </div>
+        <div class="counter">
+            <span>Nieobecni:</span>
+            <span class="counter-value" id="absentCount">0</span>
+        </div>
+        <div class="counter">
+            <span>Wszystkie AA:</span>
+            <span class="counter-value" id="unassignedCount">0</span>
+        </div>
+    </div>
+
+    <div class="main-layout">
+        <div class="board-area">
+            <div class="section-card">
+                <div class="section-title">Role główne</div>
+                <div class="roles-grid" id="rolesGrid"></div>
+            </div>
+
+            <div class="section-card oop-card">
+                <div class="section-title">OOP</div>
+                <div class="subtitle">Przeciągnij pracownika od razu na oddział</div>
+                <div class="oop-grid" id="oopGrid"></div>
+            </div>
+
+            <div class="dual-grid">
+                <div class="section-card special-card">
+                    <div class="section-title">BHP / Szkolenie / Spotkanie / XT</div>
+                    <div class="special-grid" id="specialGrid"></div>
+                </div>
+                <div class="section-card absence-card">
+                    <div class="section-title">Nieobecności</div>
+                    <div class="absence-grid" id="absenceGrid"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="role-section unassigned-section">
+                <div class="role-header">
+                    <span>WSZYSTKIE AA</span>
+                    <button class="add-to-zone-btn" onclick="openAssignModal('unassigned','unassigned','WSZYSTKIE AA')">+</button>
+                </div>
+                <div class="drop-zone" data-zone="unassigned" data-type="unassigned"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Employee Modal -->
+    <div id="employeeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" id="modalTitle">Dodaj nowego pracownika</div>
+            <form id="employeeForm">
+                <input type="hidden" id="editEmployeeId">
+                <div class="form-group">
+                    <label>Imię:</label>
+                    <input type="text" id="employeeName" required>
+                </div>
+                <div class="form-group">
+                    <label>ID:</label>
+                    <input type="text" id="employeeId" required>
+                </div>
+                <div class="form-group">
+                    <label>Login:</label>
+                    <input type="text" id="employeeLogin" required>
+                </div>
+                <div class="form-group">
+                    <label>Zmiana:</label>
+                    <select id="employeeShift" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Zdjęcie (URL):</label>
+                    <input type="url" id="employeePhoto" placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label>Menager:</label>
+                    <input type="text" id="employeeManager" placeholder="Imię menagera">
+                </div>
+                <div class="form-group">
+                    <label>Szkolenia:</label>
+                    <div class="training-checkboxes">
+                        <label><input type="checkbox" value="STOW"> STOW</label>
+                        <label><input type="checkbox" value="VR"> VR</label>
+                        <label><input type="checkbox" value="ICQA"> ICQA</label>
+                        <label><input type="checkbox" value="P2R"> P2R</label>
+                        <label><input type="checkbox" value="SM"> SM</label>
+                        <label><input type="checkbox" value="PICK"> PICK</label>
+                        <label><input type="checkbox" value="TOM"> TOM</label>
+                        <label><input type="checkbox" value="DOCK"> DOCK</label>
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary" id="saveEmployeeBtn">Dodaj</button>
+                    <button type="button" class="btn btn-danger" id="deleteEmployeeBtn" style="display:none;" onclick="deleteEmployee()">Usuń</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeEmployeeModal()">Anuluj</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Shifts Modal -->
+    <div id="shiftsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Zarządzanie zmianami</div>
+            <div class="shift-list" id="shiftList"></div>
+            <form id="shiftForm">
+                <div class="form-group">
+                    <label>Nazwa zmiany:</label>
+                    <input type="text" id="shiftName" required>
+                </div>
+                <div class="form-group">
+                    <label>Kolor:</label>
+                    <input type="color" id="shiftColor" value="#8b5cf6" required>
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">Dodaj zmianę</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeShiftsModal()">Zamknij</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Assign Modal -->
+    <div id="assignModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" id="assignModalTitle">Przypisz do pola</div>
+            <form id="assignForm">
+                <input type="hidden" id="assignZoneId">
+                <input type="hidden" id="assignZoneType">
+                <div class="form-group">
+                    <label>Pracownik:</label>
+                    <select id="assignEmployeeSelect" required></select>
+                </div>
+                <div class="form-group" id="assignNoteGroup" style="display:none;">
+                    <label id="assignNoteLabel">Notatka:</label>
+                    <input type="text" id="assignNoteInput" placeholder="Wpisz wartość">
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">Przypisz</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeAssignModal()">Anuluj</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Room Modal -->
+    <div id="roomModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Pokój Współpracy</div>
+            <div class="form-group">
+                <label>Kod pokoju:</label>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="roomCodeInput" readonly style="flex:1;">
+                    <button type="button" class="btn btn-secondary" onclick="copyRoomCode()" style="width:100px;">Kopiuj</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Dołącz do pokoju (kod):</label>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="joinRoomInput" placeholder="Wpisz kod pokoju">
+                    <button type="button" class="btn btn-primary" onclick="joinRoom()" style="width:100px;">Dołącz</button>
+                </div>
+            </div>
+            <div id="roomInfo" style="display:none; margin-top:12px; padding:12px; background-color:#e0f2fe; border-radius:4px;">
+                <p style="margin:4px 0; font-size:12px; color:#0369a1;"><strong>Status:</strong> <span id="roomStatusText">Odłączony</span></p>
+            </div>
+            <div class="btn-group" style="margin-top:16px;">
+                <button type="button" class="btn btn-secondary" onclick="closeRoomModal()" style="flex:1;">Zamknij</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.7.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.2/firebase-database.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
+
